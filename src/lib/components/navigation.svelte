@@ -4,8 +4,10 @@
 
 	const navItems = [
 		{ name: 'Home', href: '/' },
+		{ name: 'Generate', href: '/generate' },
 		{ name: 'Features', href: '/features' },
 		{ name: 'Components', href: '/components' },
+		{ name: 'Test Form', href: '/test-form' },
 		{ name: 'Pricing', href: '/pricing' },
 		{ name: 'About', href: '/about' },
 		{ name: 'API Test', href: '/test' }
