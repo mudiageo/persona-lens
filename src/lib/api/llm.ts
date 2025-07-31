@@ -47,10 +47,11 @@ export class LLMClient {
 		}
 
 		if (!this.apiKey) {
-			throw new LLMAPIError(
-				'MISSING_API_KEY',
-				`${provider.toUpperCase()} API key not found in environment variables`
-			);
+			// throw new LLMAPIError(
+			// 	'MISSING_API_KEY',
+			// 	`${provider.toUpperCase()} API key not found in environment variables`
+			// );
+			console.log(`${provider.toUpperCase()} API key not found in environment variables`);
 		}
 	}
 
@@ -343,5 +344,5 @@ export const openaiClient = new LLMClient('openai');
 export const anthropicClient = new LLMClient('anthropic');
 export const geminiClient = new LLMClient('gemini');
 
-// Default client (OpenAI)
-export const llmClient = openaiClient;
+// Default client (Gemini)
+export const llmClient = geminiClient;

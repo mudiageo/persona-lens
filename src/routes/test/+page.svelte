@@ -19,6 +19,7 @@
 		apiTestResult = null;
 		const result = await apiClient.testAPIConnections();
 		apiTestResult = result;
+		console.log(result)
 	}
 
 	async function generateTestPersona() {
@@ -62,7 +63,7 @@
 			
 			<div class="flex items-center gap-4 mb-4">
 				<Button 
-					on:click={testAPIs} 
+					onclick={testAPIs} 
 					disabled={loadingStates['api-test']?.isLoading}
 					class="min-w-[120px]"
 				>
@@ -161,7 +162,7 @@
 
 			<div class="flex items-center gap-4 mb-4">
 				<Button 
-					on:click={generateTestPersona} 
+					onclick={generateTestPersona} 
 					disabled={loadingStates['persona-generation']?.isLoading}
 					class="min-w-[150px]"
 				>

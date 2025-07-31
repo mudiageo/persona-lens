@@ -1,243 +1,799 @@
-import { env } from '$env/dynamic/private';
-import type { 
-	QlooRecommendationRequest,
-	QlooRecommendation,
-	QlooResponse,
-	QlooTasteProfile,
-	APIResponse,
-	APIError 
-} from '$lib/types/api';
+import { createQlooClient, getQlooClient, QlooApiError } from './qloo-client';
+import type { QlooApiConfig, QlooEntityType, QlooLocation } from '$lib/types/qloo';
 
-export class QlooAPIError extends Error {
-	constructor(
-		public code: string,
-		message: string,
-		public details?: any
-	) {
-		super(message);
-		this.name = 'QlooAPIError';
-	}
-}
+// Import all specialized services
+import {
+	analyzeTasteProfile,
+	getTasteTags,
+	analyzeTasteSimilarity,
+	getTasteRecommendations,
+	analyzeTasteEvolution,
+	getCategoryTasteInsights,
+	type TasteAnalysisInput,
+	type TasteProfileOptions
+} from './qloo-taste';
 
-export class QlooClient {
-	private apiKey: string;
-	private baseUrl: string;
+import {
+	analyzeDemographicProfile,
+	getDemographicInsights,
+	compareDemographicProfiles,
+	getDemographicRecommendations,
+	analyzeDemographicTrends,
+	type DemographicProfile,
+	type DemographicInsights
+} from './qloo-demographics';
 
-	constructor() {
-		this.apiKey = env.QLOO_API_KEY || '';
-		this.baseUrl = env.QLOO_API_URL || 'https://api.qloo.com/v1';
+import {
+	getCrossDomainAffinities,
+	findCrossDomainInfluencers,
+	analyzeAffinityClusters,
+	getRecommendationBridges,
+	analyzeAffinityPatterns,
+	type CrossDomainAffinityMap,
+	type AffinityCluster
+} from './qloo-cross-domain';
 
-		if (!this.apiKey) {
-			throw new QlooAPIError(
-				'MISSING_API_KEY',
-				'Qloo API key not found in environment variables'
+import {
+	analyzeCulturalContext,
+	compareCulturalContexts,
+	analyzeGlobalCulturalTrends,
+	getCulturallyAdaptedRecommendations,
+	analyzeCulturalSentiment,
+	type CulturalProfile,
+	type CulturalComparison,
+	type GlobalCulturalTrends
+} from './qloo-cultural';
+
+/**
+ * Comprehensive Qloo Service
+ * Main service class that provides access to all Qloo API functionality
+ */
+export class QlooService {
+	private initialized = false;
+
+	/**
+	 * Initialize the Qloo service with API configuration
+	 */
+	async initialize(config: QlooApiConfig): Promise<void> {
+		try {
+			createQlooClient(config);
+			this.initialized = true;
+		} catch (error) {
+			throw new QlooApiError(
+				`Failed to initialize Qloo service: ${error instanceof Error ? error.message : 'Unknown error'}`
 			);
 		}
 	}
 
-	private async makeRequest<T>(
-		endpoint: string,
-		data?: any,
-		method: 'GET' | 'POST' = 'GET'
-	): Promise<T> {
+	/**
+	 * Check if the service is initialized
+	 */
+	private ensureInitialized(): void {
+		if (!this.initialized) {
+			throw new QlooApiError('Qloo service not initialized. Call initialize() first.');
+		}
+	}
+
+	// =============================================================================
+	// TASTE ANALYSIS METHODS
+	// =============================================================================
+
+	/**
+	 * Analyze taste profile for given inputs
+	 */
+	async analyzeTasteProfile(
+		input: TasteAnalysisInput,
+		options?: TasteProfileOptions
+	) {
+		this.ensureInitialized();
+		return analyzeTasteProfile(input, options);
+	}
+
+	/**
+	 * Get taste tags for specific media types
+	 */
+	async getTasteTags(mediaTypes?: string[], keywords?: string[]) {
+		this.ensureInitialized();
+		return getTasteTags(mediaTypes, keywords);
+	}
+
+	/**
+	 * Analyze taste similarity between entities
+	 */
+	async analyzeTasteSimilarity(entityA: string, entityB: string) {
+		this.ensureInitialized();
+		return analyzeTasteSimilarity(entityA, entityB);
+	}
+
+	/**
+	 * Get taste-based recommendations
+	 */
+	async getTasteRecommendations(
+		input: TasteAnalysisInput,
+		targetType: QlooEntityType,
+		limit?: number
+	) {
+		this.ensureInitialized();
+		return getTasteRecommendations(input, targetType, limit);
+	}
+
+	/**
+	 * Analyze taste evolution over time
+	 */
+	async analyzeTasteEvolution(entityId: string, timeframe?: 'recent' | 'trending' | 'classic') {
+		this.ensureInitialized();
+		return analyzeTasteEvolution(entityId, timeframe);
+	}
+
+	/**
+	 * Get category-specific taste insights
+	 */
+	async getCategoryTasteInsights(
+		category: 'movies' | 'tv' | 'books' | 'music' | 'brands',
+		userInput: TasteAnalysisInput,
+		limit?: number
+	) {
+		this.ensureInitialized();
+		return getCategoryTasteInsights(category, userInput, limit);
+	}
+
+	// =============================================================================
+	// DEMOGRAPHIC ANALYSIS METHODS
+	// =============================================================================
+
+	/**
+	 * Analyze demographic profile
+	 */
+	async analyzeDemographicProfile(input: { entities?: string[]; tags?: string[] }) {
+		this.ensureInitialized();
+		return analyzeDemographicProfile(input);
+	}
+
+	/**
+	 * Get comprehensive demographic insights
+	 */
+	async getDemographicInsights(
+		input: { entities?: string[]; tags?: string[] },
+		targetEntityType?: QlooEntityType
+	) {
+		this.ensureInitialized();
+		return getDemographicInsights(input, targetEntityType);
+	}
+
+	/**
+	 * Compare demographic profiles between entities
+	 */
+	async compareDemographicProfiles(entityA: string, entityB: string) {
+		this.ensureInitialized();
+		return compareDemographicProfiles(entityA, entityB);
+	}
+
+	/**
+	 * Get demographic-based recommendations
+	 */
+	async getDemographicRecommendations(
+		targetDemographic: {
+			age_groups?: string[];
+			genders?: string[];
+			audiences?: string[];
+		},
+		contentType: QlooEntityType,
+		limit?: number
+	) {
+		this.ensureInitialized();
+		return getDemographicRecommendations(targetDemographic, contentType, limit);
+	}
+
+	/**
+	 * Analyze demographic trends
+	 */
+	async analyzeDemographicTrends(entities: string[], timeframe?: 'recent' | 'historical') {
+		this.ensureInitialized();
+		return analyzeDemographicTrends(entities, timeframe);
+	}
+
+	// =============================================================================
+	// CROSS-DOMAIN AFFINITY METHODS
+	// =============================================================================
+
+	/**
+	 * Get cross-domain affinities for an entity
+	 */
+	async getCrossDomainAffinities(
+		sourceEntityId: string,
+		targetDomains?: QlooEntityType[],
+		limit?: number
+	) {
+		this.ensureInitialized();
+		return getCrossDomainAffinities(sourceEntityId, targetDomains, limit);
+	}
+
+	/**
+	 * Find entities with strong cross-domain appeal
+	 */
+	async findCrossDomainInfluencers(
+		domains: QlooEntityType[],
+		minAffinityScore?: number,
+		limit?: number
+	) {
+		this.ensureInitialized();
+		return findCrossDomainInfluencers(domains, minAffinityScore, limit);
+	}
+
+	/**
+	 * Analyze affinity clusters across domains
+	 */
+	async analyzeAffinityClusters(
+		entities: string[],
+		domains: QlooEntityType[],
+		maxClusters?: number
+	) {
+		this.ensureInitialized();
+		return analyzeAffinityClusters(entities, domains, maxClusters);
+	}
+
+	/**
+	 * Get recommendation bridges between domains
+	 */
+	async getRecommendationBridges(
+		sourceDomain: QlooEntityType,
+		targetDomain: QlooEntityType,
+		sourceEntities: string[],
+		limit?: number
+	) {
+		this.ensureInitialized();
+		return getRecommendationBridges(sourceDomain, targetDomain, sourceEntities, limit);
+	}
+
+	/**
+	 * Analyze affinity patterns across entities
+	 */
+	async analyzeAffinityPatterns(entities: string[], domains: QlooEntityType[]) {
+		this.ensureInitialized();
+		return analyzeAffinityPatterns(entities, domains);
+	}
+
+	// =============================================================================
+	// CULTURAL CONTEXT METHODS
+	// =============================================================================
+
+	/**
+	 * Analyze cultural context for a location
+	 */
+	async analyzeCulturalContext(
+		location: QlooLocation,
+		contentType?: QlooEntityType,
+		limit?: number
+	) {
+		this.ensureInitialized();
+		return analyzeCulturalContext(location, contentType, limit);
+	}
+
+	/**
+	 * Compare cultural contexts between locations
+	 */
+	async compareCulturalContexts(
+		locationA: QlooLocation,
+		locationB: QlooLocation,
+		contentType?: QlooEntityType
+	) {
+		this.ensureInitialized();
+		return compareCulturalContexts(locationA, locationB, contentType);
+	}
+
+	/**
+	 * Analyze global cultural trends
+	 */
+	async analyzeGlobalCulturalTrends(contentType?: QlooEntityType, regions?: string[]) {
+		this.ensureInitialized();
+		return analyzeGlobalCulturalTrends(contentType, regions);
+	}
+
+	/**
+	 * Get culturally adapted recommendations
+	 */
+	async getCulturallyAdaptedRecommendations(
+		userPreferences: { entities?: string[]; tags?: string[] },
+		targetLocation: QlooLocation,
+		contentType: QlooEntityType,
+		adaptationLevel?: 'light' | 'moderate' | 'heavy',
+		limit?: number
+	) {
+		this.ensureInitialized();
+		return getCulturallyAdaptedRecommendations(
+			userPreferences,
+			targetLocation,
+			contentType,
+			adaptationLevel,
+			limit
+		);
+	}
+
+	/**
+	 * Analyze cultural sentiment for content
+	 */
+	async analyzeCulturalSentiment(contentId: string, regions: string[]) {
+		this.ensureInitialized();
+		return analyzeCulturalSentiment(contentId, regions);
+	}
+
+	// =============================================================================
+	// UTILITY METHODS
+	// =============================================================================
+
+	/**
+	 * Search for entities by name
+	 */
+	async searchEntities(query: string, types?: string[], limit?: number) {
+		this.ensureInitialized();
+		const client = getQlooClient();
+		return client.searchEntities({ query, types, limit });
+	}
+
+	/**
+	 * Get entity details by ID
+	 */
+	async getEntityById(entityId: string) {
+		this.ensureInitialized();
+		const client = getQlooClient();
+		return client.getEntityById(entityId);
+	}
+
+	/**
+	 * Search for tags
+	 */
+	async searchTags(query: string, types?: string[]) {
+		this.ensureInitialized();
+		const client = getQlooClient();
+		return client.searchTags(query, types);
+	}
+
+	/**
+	 * Get available audiences
+	 */
+	async getAudiences() {
+		this.ensureInitialized();
+		const client = getQlooClient();
+		return client.getAudiences();
+	}
+
+	/**
+	 * Get trending content
+	 */
+	async getTrending(entityType: QlooEntityType, limit?: number) {
+		this.ensureInitialized();
+		const client = getQlooClient();
+		return client.getTrending(entityType, limit);
+	}
+
+	// =============================================================================
+	// INTEGRATED ANALYSIS METHODS
+	// =============================================================================
+
+	/**
+	 * Comprehensive entity analysis combining all features
+	 */
+	async comprehensiveEntityAnalysis(entityId: string) {
+		this.ensureInitialized();
+
 		try {
-			const options: RequestInit = {
-				method,
-				headers: {
-					'Content-Type': 'application/json',
-					'Authorization': `Bearer ${this.apiKey}`,
-					'Accept': 'application/json'
-				}
+			const [
+				tasteProfile,
+				demographicProfile,
+				crossDomainAffinities,
+				// Cultural analysis would need location context
+			] = await Promise.all([
+				this.analyzeTasteProfile({ entities: [entityId] }),
+				this.analyzeDemographicProfile({ entities: [entityId] }),
+				this.getCrossDomainAffinities(entityId),
+			]);
+
+			return {
+				entity_id: entityId,
+				taste_profile: tasteProfile,
+				demographic_profile: demographicProfile,
+				cross_domain_affinities: crossDomainAffinities,
+				analysis_timestamp: new Date().toISOString()
 			};
+		} catch (error) {
+			throw new QlooApiError(
+				`Comprehensive analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+			);
+		}
+	}
 
-			if (data && method === 'POST') {
-				options.body = JSON.stringify(data);
-			}
+	/**
+	 * Multi-dimensional recommendation engine
+	 */
+	async getMultiDimensionalRecommendations(
+		input: {
+			entities?: string[];
+			tags?: string[];
+			demographics?: { age_groups?: string[]; genders?: string[]; audiences?: string[] };
+			location?: QlooLocation;
+			cultural_adaptation?: 'light' | 'moderate' | 'heavy';
+		},
+		targetType: QlooEntityType,
+		limit: number = 20
+	) {
+		this.ensureInitialized();
 
-			const url = data && method === 'GET' 
-				? `${this.baseUrl}${endpoint}?${new URLSearchParams(data).toString()}`
-				: `${this.baseUrl}${endpoint}`;
+		try {
+			// Get base taste recommendations
+			const tasteRecommendations = await this.getTasteRecommendations(
+				{ entities: input.entities, tags: input.tags },
+				targetType,
+				limit * 2
+			);
 
-			const response = await fetch(url, options);
-
-			if (!response.ok) {
-				const errorData = await response.json().catch(() => ({}));
-				throw new QlooAPIError(
-					`HTTP_${response.status}`,
-					errorData.error?.message || `Request failed with status ${response.status}`,
-					errorData
+			// Get demographic recommendations if demographic info provided
+			let demographicRecommendations = null;
+			if (input.demographics) {
+				demographicRecommendations = await this.getDemographicRecommendations(
+					input.demographics,
+					targetType,
+					limit
 				);
 			}
 
-			return await response.json();
-		} catch (error) {
-			if (error instanceof QlooAPIError) {
-				throw error;
+			// Get culturally adapted recommendations if location provided
+			let culturalRecommendations = null;
+			if (input.location) {
+				culturalRecommendations = await this.getCulturallyAdaptedRecommendations(
+					{ entities: input.entities, tags: input.tags },
+					input.location,
+					targetType,
+					input.cultural_adaptation,
+					limit
+				);
 			}
-			throw new QlooAPIError(
-				'NETWORK_ERROR',
-				'Failed to connect to Qloo API',
-				error
+
+			// Combine and score recommendations
+			const combinedRecommendations = this.combineRecommendations(
+				tasteRecommendations,
+				demographicRecommendations?.recommendations,
+				culturalRecommendations?.recommendations,
+				limit
+			);
+
+			return {
+				recommendations: combinedRecommendations,
+				taste_based: tasteRecommendations.slice(0, 10),
+				demographic_based: demographicRecommendations?.recommendations.slice(0, 10) || [],
+				culturally_adapted: culturalRecommendations?.recommendations.slice(0, 10) || [],
+				cultural_relevance_scores: culturalRecommendations?.cultural_relevance_scores || {},
+				demographic_match_scores: demographicRecommendations?.demographic_match_scores || {}
+			};
+		} catch (error) {
+			throw new QlooApiError(
+				`Multi-dimensional recommendations failed: ${error instanceof Error ? error.message : 'Unknown error'}`
 			);
 		}
 	}
 
-	async getRecommendations(request: QlooRecommendationRequest): Promise<APIResponse<QlooRecommendation[]>> {
+	/**
+	 * Cultural market analysis for content
+	 */
+	async culturalMarketAnalysis(
+		contentId: string,
+		targetRegions: string[] = ['North America', 'Europe', 'Asia', 'Latin America']
+	) {
+		this.ensureInitialized();
+
 		try {
-			const response = await this.makeRequest<QlooResponse<QlooRecommendation[]>>(
-				'/recommendations',
-				request,
-				'POST'
+			const [culturalSentiment, crossDomainAffinities] = await Promise.all([
+				this.analyzeCulturalSentiment(contentId, targetRegions),
+				this.getCrossDomainAffinities(contentId)
+			]);
+
+			// Calculate market scores
+			const marketScores = Object.entries(culturalSentiment).map(([region, sentiment]) => ({
+				region,
+				market_score: sentiment.market_potential,
+				sentiment_score: sentiment.sentiment_score,
+				cultural_reception: sentiment.cultural_reception,
+				adaptation_needs: sentiment.adaptation_needs
+			}));
+
+			marketScores.sort((a, b) => b.market_score - a.market_score);
+
+			return {
+				content_id: contentId,
+				market_analysis: marketScores,
+				cross_domain_appeal: crossDomainAffinities,
+				top_markets: marketScores.slice(0, 3),
+				adaptation_priority: marketScores.filter(m => 
+					m.market_score > 0.6 && m.sentiment_score < 0.5
+				),
+				analysis_timestamp: new Date().toISOString()
+			};
+		} catch (error) {
+			throw new QlooApiError(
+				`Cultural market analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`
 			);
-
-			if (response.status === 'success') {
-				return {
-					success: true,
-					data: response.data
-				};
-			} else {
-				return {
-					success: false,
-					error: response.error?.message || 'Failed to get recommendations'
-				};
-			}
-		} catch (error) {
-			const apiError = error as APIError;
-			return {
-				success: false,
-				error: apiError.message || 'Error fetching recommendations'
-			};
 		}
 	}
 
-	async getTasteProfile(entityId: string, entityType: string = 'person'): Promise<APIResponse<QlooTasteProfile[]>> {
+	// =============================================================================
+	// MULTI-DIMENSIONAL ANALYSIS METHODS
+	// =============================================================================
+
+	/**
+	 * Perform comprehensive multi-dimensional analysis
+	 */
+	async performMultiDimensionalAnalysis(input: {
+		taste?: TasteAnalysisInput;
+		demographics?: { entities?: string[]; tags?: string[] };
+		location?: QlooLocation;
+		crossDomainTargets?: QlooEntityType[];
+		analysisDepth?: 'basic' | 'detailed' | 'comprehensive';
+	}) {
+		this.ensureInitialized();
+
+		const results: any = {
+			timestamp: new Date().toISOString(),
+			analysis: {}
+		};
+
 		try {
-			const response = await this.makeRequest<QlooResponse<QlooTasteProfile[]>>(
-				'/taste-profile',
-				{ entity_id: entityId, entity_type: entityType }
+			// Taste analysis
+			if (input.taste) {
+				results.analysis.taste = await this.analyzeTasteProfile(input.taste);
+			}
+
+			// Demographic analysis  
+			if (input.demographics) {
+				results.analysis.demographics = await this.analyzeDemographicProfile(input.demographics);
+			}
+
+			// Cultural context analysis
+			if (input.location) {
+				results.analysis.cultural = await this.analyzeCulturalContext(input.location);
+			}
+
+			// Cross-domain analysis
+			if (input.crossDomainTargets && (input.taste?.entities?.[0] || input.demographics?.entities?.[0])) {
+				const sourceEntity = input.taste?.entities?.[0] || input.demographics?.entities?.[0];
+				if (sourceEntity) {
+					results.analysis.crossDomain = await this.getCrossDomainAffinities(
+						sourceEntity,
+						input.crossDomainTargets
+					);
+				}
+			}
+
+			return {
+				success: true,
+				data: results
+			};
+		} catch (error) {
+			throw new QlooApiError(
+				`Multi-dimensional analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`
 			);
-
-			if (response.status === 'success') {
-				return {
-					success: true,
-					data: response.data
-				};
-			} else {
-				return {
-					success: false,
-					error: response.error?.message || 'Failed to get taste profile'
-				};
-			}
-		} catch (error) {
-			const apiError = error as APIError;
-			return {
-				success: false,
-				error: apiError.message || 'Error fetching taste profile'
-			};
 		}
 	}
 
-	async searchEntities(query: string, type?: string, limit: number = 10): Promise<APIResponse<any[]>> {
+	/**
+	 * Generate comprehensive recommendations using all available data
+	 */
+	async generateComprehensiveRecommendations(input: {
+		taste?: TasteAnalysisInput;
+		demographics?: DemographicProfile;
+		location?: QlooLocation;
+		targetTypes: QlooEntityType[];
+		preferences?: {
+			novelty?: 'conservative' | 'moderate' | 'adventurous';
+			diversity?: 'focused' | 'balanced' | 'wide';
+			cultural_adaptation?: 'local' | 'global' | 'mixed';
+		};
+		limit?: number;
+	}) {
+		this.ensureInitialized();
+
 		try {
-			const params: any = {
-				q: query,
-				limit: limit.toString()
+			const recommendations: any = {
+				primary: [],
+				crossDomain: [],
+				culturallyAdapted: [],
+				metadata: {
+					analysisType: 'comprehensive',
+					timestamp: new Date().toISOString(),
+					confidence: 0
+				}
 			};
 
-			if (type) {
-				params.type = type;
+			// Get primary recommendations for each target type
+			for (const targetType of input.targetTypes) {
+				if (input.taste) {
+					const tasteRecs = await this.getTasteRecommendations(input.taste, targetType, input.limit);
+					recommendations.primary.push({
+						type: 'taste',
+						targetType,
+						recommendations: tasteRecs
+					});
+				}
+
+				if (input.demographics) {
+					const demoRecs = await this.getDemographicRecommendations(
+						{
+							age_groups: input.demographics.age_distribution ? Object.keys(input.demographics.age_distribution) : [],
+							genders: input.demographics.gender_distribution ? Object.keys(input.demographics.gender_distribution) : [],
+							audiences: []
+						},
+						targetType,
+						input.limit
+					);
+					recommendations.primary.push({
+						type: 'demographic',
+						targetType,
+						recommendations: demoRecs
+					});
+				}
 			}
 
-			const response = await this.makeRequest<QlooResponse<any[]>>(
-				'/search',
-				params
+			// Get cross-domain recommendations if we have a source entity
+			const sourceEntity = input.taste?.entities?.[0];
+			if (sourceEntity) {
+				const crossDomainRecs = await this.getCrossDomainAffinities(
+					sourceEntity,
+					input.targetTypes,
+					input.limit
+				);
+				recommendations.crossDomain = crossDomainRecs;
+			}
+
+			// Get culturally adapted recommendations if location is provided
+			if (input.location && recommendations.primary.length > 0) {
+				const baseRecs = recommendations.primary
+					.flatMap((r: any) => r.recommendations?.data?.entities || [])
+					.map((e: any) => e.entity_id)
+					.slice(0, input.limit || 10);
+
+				if (baseRecs.length > 0) {
+					const culturalRecs = await this.getCulturallyAdaptedRecommendations(
+						{ entities: baseRecs },
+						input.location,
+						input.targetTypes[0] || 'urn:entity:movie',
+						'moderate'
+					);
+					recommendations.culturallyAdapted = culturalRecs;
+				}
+			}
+
+			// Calculate confidence score based on available data
+			let confidence = 0.3; // Base confidence
+			if (input.taste) confidence += 0.3;
+			if (input.demographics) confidence += 0.2;
+			if (input.location) confidence += 0.2;
+			recommendations.metadata.confidence = Math.min(confidence, 1.0);
+
+			return {
+				success: true,
+				data: recommendations
+			};
+		} catch (error) {
+			throw new QlooApiError(
+				`Comprehensive recommendations failed: ${error instanceof Error ? error.message : 'Unknown error'}`
 			);
-
-			if (response.status === 'success') {
-				return {
-					success: true,
-					data: response.data
-				};
-			} else {
-				return {
-					success: false,
-					error: response.error?.message || 'Failed to search entities'
-				};
-			}
-		} catch (error) {
-			const apiError = error as APIError;
-			return {
-				success: false,
-				error: apiError.message || 'Error searching entities'
-			};
 		}
 	}
 
-	async getCulturalInsights(
-		demographic: Record<string, any>,
-		interests: string[]
-	): Promise<APIResponse<QlooRecommendation[]>> {
+	/**
+	 * Test API connection and functionality
+	 */
+	async testConnection(): Promise<{ success: boolean; message: string; details?: any }> {
 		try {
-			const request: QlooRecommendationRequest = {
-				input: {
-					type: 'demographic',
-					data: {
-						...demographic,
-						interests
-					}
-				},
-				output_types: ['culture', 'lifestyle', 'brand', 'media'],
-				count: 50
-			};
-
-			return await this.getRecommendations(request);
-		} catch (error) {
-			return {
-				success: false,
-				error: 'Error fetching cultural insights'
-			};
-		}
-	}
-
-	async getBrandAffinities(tasteProfile: QlooTasteProfile[]): Promise<APIResponse<QlooRecommendation[]>> {
-		try {
-			const request: QlooRecommendationRequest = {
-				input: {
-					type: 'taste_profile',
-					data: tasteProfile
-				},
-				output_types: ['brand', 'product'],
-				count: 30
-			};
-
-			return await this.getRecommendations(request);
-		} catch (error) {
-			return {
-				success: false,
-				error: 'Error fetching brand affinities'
-			};
-		}
-	}
-
-	async testConnection(): Promise<APIResponse<boolean>> {
-		try {
-			// Test with a simple search query
-			const response = await this.searchEntities('test', undefined, 1);
+			const client = getQlooClient();
 			
-			return {
-				success: response.success,
-				data: response.success,
-				message: response.success ? 'Qloo API connection successful' : 'Qloo API connection failed'
-			};
+			// Test basic search functionality
+			const testResult = await client.searchEntities({
+				query: 'Marvel',
+				limit: 1
+			});
+
+			if (testResult.success) {
+				return {
+					success: true,
+					message: 'Qloo API connection successful',
+					details: {
+						testQuery: 'Marvel',
+						resultCount: testResult.results?.entities?.length || 0
+					}
+				};
+			} else {
+				return {
+					success: false,
+					message: 'Qloo API connection failed - no results returned'
+				};
+			}
 		} catch (error) {
 			return {
 				success: false,
-				data: false,
-				error: 'Failed to test Qloo API connection'
+				message: `Qloo API connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`
 			};
 		}
+	}
+
+	// =============================================================================
+	// PRIVATE HELPER METHODS
+	// =============================================================================
+
+	private combineRecommendations(
+		tasteRecs: any[],
+		demoRecs?: any[],
+		culturalRecs?: any[],
+		limit: number = 20
+	): any[] {
+		// Create a map to track entity scores
+		const entityScores = new Map<string, { entity: any; score: number }>();
+
+		// Add taste recommendations (base weight: 1.0)
+		tasteRecs.forEach((entity, index) => {
+			const score = Math.max(0.1, 1 - (index / tasteRecs.length));
+			entityScores.set(entity.entity_id, { entity, score });
+		});
+
+		// Add demographic recommendations (weight: 0.8)
+		if (demoRecs) {
+			demoRecs.forEach((entity, index) => {
+				const score = Math.max(0.1, 1 - (index / demoRecs.length)) * 0.8;
+				const existing = entityScores.get(entity.entity_id);
+				if (existing) {
+					existing.score += score;
+				} else {
+					entityScores.set(entity.entity_id, { entity, score });
+				}
+			});
+		}
+
+		// Add cultural recommendations (weight: 0.9)
+		if (culturalRecs) {
+			culturalRecs.forEach((entity, index) => {
+				const score = Math.max(0.1, 1 - (index / culturalRecs.length)) * 0.9;
+				const existing = entityScores.get(entity.entity_id);
+				if (existing) {
+					existing.score += score;
+				} else {
+					entityScores.set(entity.entity_id, { entity, score });
+				}
+			});
+		}
+
+		// Sort by combined score and return top results
+		return Array.from(entityScores.values())
+			.sort((a, b) => b.score - a.score)
+			.slice(0, limit)
+			.map(item => item.entity);
 	}
 }
 
-// Singleton instance
-export const qlooClient = new QlooClient();
+// Create and export singleton instance
+export const qlooService = new QlooService();
+
+// Export all types for convenience
+export type {
+	// Core types
+	QlooApiConfig,
+	QlooEntityType,
+	QlooLocation,
+	
+	// Taste types
+	TasteAnalysisInput,
+	TasteProfileOptions,
+	
+	// Demographic types
+	DemographicProfile,
+	DemographicInsights,
+	
+	// Cross-domain types
+	CrossDomainAffinityMap,
+	AffinityCluster,
+	
+	// Cultural types
+	CulturalProfile,
+	CulturalComparison,
+	GlobalCulturalTrends
+};
+
+// Export error class
+export { QlooApiError };
