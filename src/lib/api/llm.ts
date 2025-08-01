@@ -38,7 +38,7 @@ export class LLMClient {
 		} else if (provider === 'gemini') {
 			this.apiKey = env.GEMINI_API_KEY || '';
 			this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
-			this.defaultModel = 'gemini-1.5-pro';
+			this.defaultModel = 'gemini-2.0-flash';
 		} else {
 			// Fallback to OpenAI
 			this.apiKey = env.OPENAI_API_KEY || '';
@@ -67,9 +67,10 @@ export class LLMClient {
 
 			if (this.provider === 'gemini') {
 				// Gemini uses query parameter for API key
-				url = `${this.baseUrl}${endpoint}?key=${this.apiKey}`;
+				url = `${this.baseUrl}${endpoint}`;
 				headers = {
 					'Content-Type': 'application/json',
+						'X-goog-api-key': this.apiKey,
 					...options.headers
 				};
 				// Transform data for Gemini format
@@ -250,22 +251,39 @@ export class LLMClient {
 
 	// Transformation methods for different API formats
 	private transformForGemini(data: any): any {
-		// Transform OpenAI format to Gemini format
-		const { messages, model, temperature, max_tokens } = data;
-		
-		const contents = messages.map((msg: LLMMessage) => ({
-			role: msg.role === 'assistant' ? 'model' : msg.role,
-			parts: [{ text: msg.content }]
-		}));
+	// Destructure the OpenAI-like data object
+	const { messages, temperature, max_tokens } = data;
 
-		return {
-			contents,
-			generationConfig: {
-				temperature: temperature || 0.7,
-				maxOutputTokens: max_tokens || 1000,
-			}
-		};
+	// 1. Extract and combine all system messages into a single prompt
+	const systemPrompt = messages
+		.filter((msg: LLMMessage) => msg.role === 'system')
+		.map((msg: LLMMessage) => msg.content)
+		.join('\n');
+
+	// 2. Filter out the original system messages to get the conversation history
+	const conversationMessages = messages.filter(
+		(msg: LLMMessage) => msg.role !== 'system'
+	);
+
+	// 3. Prepend the system prompt to the first message in the conversation
+	if (systemPrompt && conversationMessages.length > 0) {
+		conversationMessages[0].content = `${systemPrompt}\n\n${conversationMessages[0].content}`;
 	}
+
+	// 4. Map the cleaned conversation to Gemini's expected format
+	const contents = conversationMessages.map((msg: LLMMessage) => ({
+		role: msg.role === 'assistant' ? 'model' : 'user',
+		parts: [{ text: msg.content }],
+	}));
+
+	return {
+		contents,
+		generationConfig: {
+			temperature: temperature ?? 0.7,
+			maxOutputTokens: max_tokens ?? 1000,
+		},
+	};
+}
 
 	private transformFromGemini(response: any): any {
 		// Transform Gemini response to OpenAI format
