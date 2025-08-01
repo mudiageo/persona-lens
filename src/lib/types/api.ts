@@ -83,35 +83,70 @@ export interface QlooResponse<T = any> {
 export interface PersonaProfile {
 	id: string;
 	name: string;
-	demographic: {
-		age_range: string;
+	tagline?: string;
+	demographics: {
+		age: number;
 		gender: string;
 		location: string;
-		income_level: string;
+		occupation: string;
+		income: string;
 		education: string;
+		family_status: string;
+		living_situation: string;
 	};
-	cultural_attributes: {
+	psychographics: {
 		values: string[];
-		interests: string[];
-		lifestyle: string[];
-		media_consumption: string[];
+		motivations: string[];
+		personality_traits: string[];
+		lifestyle: string;
+		stress_triggers: string[];
+		relaxation_methods: string[];
 	};
-	taste_profile: QlooTasteProfile[];
 	behavioral_patterns: {
-		shopping_habits: string[];
-		decision_drivers: string[];
-		communication_preferences: string[];
-		brand_affinities: string[];
+		daily_routine: string;
+		decision_making_style: string;
+		research_habits: string;
+		shopping_behavior: string;
+		brand_loyalty: string;
 	};
-	insights: {
-		summary: string;
-		key_motivations: string[];
-		marketing_recommendations: string[];
+	digital_behavior: {
+		primary_devices: string[];
+		social_media_platforms: string[];
 		content_preferences: string[];
+		technology_comfort: string;
+		online_activity_times: string[];
+	};
+	goals_and_pain_points: {
+		primary_goals: string[];
+		aspirations: string[];
+		current_challenges: string[];
+		frustrations: string[];
+		success_metrics: string[];
+	};
+	product_relationship: {
+		discovery_channels: string[];
+		decision_factors: string[];
+		potential_objections: string[];
+		ideal_experience: string;
+		post_purchase_behavior: string;
+	};
+	marketing_strategy: {
+		best_channels: string[];
+		messaging_style: string;
+		content_types: string[];
+		communication_frequency: string;
+		timing_preferences: string[];
+	};
+	quotes: {
+		pain_point: string;
+		aspiration: string;
+		product_need: string;
 	};
 	confidence_score: number;
-	created_at: string;
-	updated_at: string;
+	qloo_insights?: any;
+	generation_timestamp: string;
+	created_at?: string;
+	updated_at?: string;
 }
 
 export interface PersonaGenerationRequest {

@@ -709,7 +709,7 @@ export class QlooService {
 				try {
 					await this.initialize({
 						apiKey: env.QLOO_API_KEY || '',
-						baseUrl: env.QLOO_API_URL || 'https://hackathon.qloo.com',
+						baseUrl: env.QLOO_API_URL || 'https://hackathon.api.qloo.com',
 						isHackathon: true
 					});
 				} catch (initError) {
@@ -729,13 +729,38 @@ export class QlooService {
 				limit: 1
 			});
 
+			// Also test audience API specifically
+			let audienceTestResult = null;
+			let audienceStatus = 'failed';
+			try {
+				console.log('[QlooService] Testing audience API endpoint...');
+				audienceTestResult = await client.getAudiences();
+				
+				if (audienceTestResult.success) {
+					// Check if we got real data or fallback data by looking for specific test audience
+					const hasTestAudience = audienceTestResult.results?.audiences?.some(
+						aud => aud.audience_id === 'aud_gen_z_consumers'
+					);
+					audienceStatus = hasTestAudience ? 'fallback_data' : 'live_api';
+					console.log(`[QlooService] Audience API test successful (${audienceStatus}):`, {
+						audienceCount: audienceTestResult.results?.audiences?.length || 0,
+						sampleAudiences: audienceTestResult.results?.audiences?.slice(0, 3).map(a => a.name) || []
+					});
+				}
+			} catch (audienceError) {
+				console.error('[QlooService] Audience API test failed:', audienceError);
+				audienceStatus = 'error';
+			}
+
 			if (testResult.results) {
 				return {
 					success: true,
 					message: 'Qloo API connection successful',
 					details: {
 						testQuery: 'Marvel',
-						resultCount: testResult.results?.entities?.length || 0
+						resultCount: testResult.results?.entities?.length || 0,
+						audienceTest: audienceStatus,
+						audienceCount: audienceTestResult?.results?.audiences?.length || 0
 					}
 				};
 			} else {

@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
-import { personaService } from '$lib/api';
+import { personaGenerationService } from '$lib/api/persona-generation';
 import { json } from '@sveltejs/kit';
-import type { PersonaGenerationRequest } from '$lib/types/api';
+import type { PersonaGenerationData } from '$lib/schemas/persona-form';
 
 // Mock data for demonstration
 const mockPersonas = [
@@ -32,21 +32,28 @@ export const GET: RequestHandler = async () => {
 
 export const POST: RequestHandler = async ({ request }) => {
 	try {
-		const data: PersonaGenerationRequest = await request.json();
+		const data: PersonaGenerationData = await request.json();
 		
-		// Generate persona using the service
-		const result = await personaService.generatePersona(data);
+		// Generate persona using the new LLM-powered service
+		const result = await personaGenerationService.generatePersona(data, {
+			includeQlooInsights: true,
+			enhanceWithCulturalData: true,
+			validateResults: true,
+			model: 'gpt-4o-mini',
+			temperature: 0.7
+		});
 		
-		if (result.success) {
+		if (result.success && result.persona) {
 			return json({
 				success: true,
-				persona: result.data,
+				persona: result.persona,
+				metadata: result.metadata,
 				message: 'Persona generated successfully'
 			}, { status: 201 });
 		} else {
 			return json({
 				success: false,
-				error: result.error
+				error: result.error || 'Failed to generate persona'
 			}, { status: 400 });
 		}
 	} catch (error) {
