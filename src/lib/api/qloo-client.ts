@@ -9,7 +9,6 @@ import type {
 	QlooDemographicsResponse,
 	QlooSearchResponse,
 	QlooAudiencesResponse,
-	QlooApiError,
 	QlooTasteProfile,
 	QlooCrossDomainAffinity,
 	QlooCulturalContext,
@@ -55,6 +54,12 @@ export class QlooApiClient {
 			const data = await response.json();
 
 			if (!response.ok) {
+				console.error('[QlooApiClient] Request failed:', {
+					url,
+					status: response.status,
+					error: data.error,
+					data
+				});
 				throw new QlooApiError(
 					data.error || `Request failed with status ${response.status}`,
 					response.status,
@@ -64,6 +69,10 @@ export class QlooApiClient {
 
 			return data as QlooApiResponse<T>;
 		} catch (error) {
+			console.error('[QlooApiClient] Request error:', {
+				endpoint,
+				error: error instanceof Error ? error.message : error
+			});
 			if (error instanceof QlooApiError) {
 				throw error;
 			}

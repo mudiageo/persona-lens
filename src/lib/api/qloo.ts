@@ -1,3 +1,4 @@
+import { env } from '$env/dynamic/private';
 import { createQlooClient, getQlooClient, QlooApiError } from './qloo-client';
 import type { QlooApiConfig, QlooEntityType, QlooLocation } from '$lib/types/qloo';
 
@@ -59,6 +60,7 @@ export class QlooService {
 			createQlooClient(config);
 			this.initialized = true;
 		} catch (error) {
+			console.error('[QlooService] Initialization failed:', error);
 			throw new QlooApiError(
 				`Failed to initialize Qloo service: ${error instanceof Error ? error.message : 'Unknown error'}`
 			);
@@ -66,11 +68,20 @@ export class QlooService {
 	}
 
 	/**
-	 * Check if the service is initialized
+	 * Check if the service is initialized and initialize if needed
 	 */
-	private ensureInitialized(): void {
+	private async ensureInitialized(): Promise<void> {
 		if (!this.initialized) {
-			throw new QlooApiError('Qloo service not initialized. Call initialize() first.');
+			try {
+				await this.initialize({
+					apiKey: env.QLOO_API_KEY || '',
+					baseUrl: env.QLOO_API_URL || 'https://hackathon.qloo.com',
+					isHackathon: true
+				});
+			} catch (error) {
+				console.error('[QlooService] Auto-initialization failed:', error);
+				throw error;
+			}
 		}
 	}
 
@@ -156,8 +167,13 @@ export class QlooService {
 		input: { entities?: string[]; tags?: string[] },
 		targetEntityType?: QlooEntityType
 	) {
-		this.ensureInitialized();
-		return getDemographicInsights(input, targetEntityType);
+		try {
+			await this.ensureInitialized();
+			return await getDemographicInsights(input, targetEntityType);
+		} catch (error) {
+			console.error('[QlooService] getDemographicInsights failed:', error);
+			throw error;
+		}
 	}
 
 	/**
@@ -204,8 +220,13 @@ export class QlooService {
 		targetDomains?: QlooEntityType[],
 		limit?: number
 	) {
-		this.ensureInitialized();
-		return getCrossDomainAffinities(sourceEntityId, targetDomains, limit);
+		try {
+			await this.ensureInitialized();
+			return await getCrossDomainAffinities(sourceEntityId, targetDomains, limit);
+		} catch (error) {
+			console.error('[QlooService] getCrossDomainAffinities failed:', error);
+			throw error;
+		}
 	}
 
 	/**
@@ -683,6 +704,23 @@ export class QlooService {
 	 */
 	async testConnection(): Promise<{ success: boolean; message: string; details?: any }> {
 		try {
+			// Auto-initialize if not already initialized
+			if (!this.initialized) {
+				try {
+					await this.initialize({
+						apiKey: env.QLOO_API_KEY || '',
+						baseUrl: env.QLOO_API_URL || 'https://hackathon.qloo.com',
+						isHackathon: true
+					});
+				} catch (initError) {
+					console.error('[QlooService] testConnection initialization failed:', initError);
+					return {
+						success: false,
+						message: `Qloo API initialization failed: ${initError instanceof Error ? initError.message : 'Unknown error'}`
+					};
+				}
+			}
+
 			const client = getQlooClient();
 			
 			// Test basic search functionality
@@ -691,7 +729,7 @@ export class QlooService {
 				limit: 1
 			});
 
-			if (testResult.success) {
+			if (testResult.results) {
 				return {
 					success: true,
 					message: 'Qloo API connection successful',
@@ -701,12 +739,14 @@ export class QlooService {
 					}
 				};
 			} else {
+				console.error('[QlooService] testConnection failed - no results returned:', testResult);
 				return {
 					success: false,
 					message: 'Qloo API connection failed - no results returned'
 				};
 			}
 		} catch (error) {
+			console.error('[QlooService] testConnection error:', error);
 			return {
 				success: false,
 				message: `Qloo API connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`

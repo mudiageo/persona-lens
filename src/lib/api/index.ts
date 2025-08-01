@@ -1,5 +1,5 @@
 import { llmClient, openaiClient, anthropicClient, geminiClient } from './llm';
-import { qlooClient } from './qloo';
+import { qlooService } from './qloo';
 import type { 
 	PersonaProfile, 
 	PersonaGenerationRequest, 
@@ -12,7 +12,7 @@ export class PersonaService {
 
 	constructor(
 		private llm = llmClient,
-		private qloo = qlooClient
+		private qloo = qlooService
 	) {}
 
 	// Method to switch LLM provider
@@ -79,7 +79,10 @@ export class PersonaService {
 			const interests = this.extractInterests(request.target_description);
 			const demographic = request.demographic_filters || {};
 
-			const tasteData = await this.qloo.getCulturalInsights(demographic, interests);
+			const tasteData = await this.qloo.getDemographicInsights({ 
+				tags: interests, 
+				entities: [] 
+			});
 			
 			// Step 3: Generate brand affinities if taste data is available
 			this.setLoadingState(requestId, {
@@ -88,17 +91,17 @@ export class PersonaService {
 			});
 
 			let brandAffinities: any[] = [];
-			if (tasteData.success && tasteData.data) {
-				const brandResponse = await this.qloo.getBrandAffinities(
-					tasteData.data.map(item => ({
-						id: item.id,
-						name: item.name || '',
-						category: item.type || 'general',
-						confidence: item.confidence || 0.5,
-						attributes: item.attributes || {}
-					}))
-				);
-				brandAffinities = brandResponse.data || [];
+			if (tasteData.recommended_content && tasteData.recommended_content.length > 0) {
+				// Use the first entity from taste data to get cross-domain affinities for brands
+				const firstEntity = tasteData.recommended_content[0];
+				if (firstEntity.entity_id) {
+					const brandResponse = await this.qloo.getCrossDomainAffinities(
+						firstEntity.entity_id,
+						['urn:entity:brand'], // Target brands specifically
+						10 // Limit to 10 brand affinities
+					);
+					brandAffinities = brandResponse.domain_affinities['urn:entity:brand']?.entities || [];
+				}
 			}
 
 			// Step 4: Combine and structure the persona
@@ -112,12 +115,12 @@ export class PersonaService {
 				name: this.generatePersonaName(request.target_description),
 				demographic: this.extractDemographic(request.demographic_filters),
 				cultural_attributes: this.extractCulturalAttributes(culturalInsights.data || ''),
-				taste_profile: tasteData.data?.map(item => ({
-					id: item.id,
+				taste_profile: tasteData.recommended_content?.map(item => ({
+					id: item.entity_id,
 					name: item.name || '',
 					category: item.type || 'general',
-					confidence: item.confidence || 0.5,
-					attributes: item.attributes || {}
+					confidence: 0.5, // Default confidence since it's not in QlooEntity
+					attributes: item.properties || {}
 				})) || [],
 				behavioral_patterns: this.extractBehavioralPatterns(culturalInsights.data || ''),
 				insights: {
@@ -126,7 +129,7 @@ export class PersonaService {
 					marketing_recommendations: this.extractMarketingRecs(culturalInsights.data || ''),
 					content_preferences: this.extractContentPrefs(culturalInsights.data || '')
 				},
-				confidence_score: this.calculateConfidenceScore(culturalInsights.success, tasteData.success),
+				confidence_score: this.calculateConfidenceScore(culturalInsights.success, true),
 				created_at: new Date().toISOString(),
 				updated_at: new Date().toISOString()
 			};
@@ -143,6 +146,7 @@ export class PersonaService {
 			};
 
 		} catch (error) {
+			console.error('[PersonaService] generatePersona error:', error);
 			this.setLoadingState(requestId, {
 				isLoading: false,
 				error: {
@@ -169,7 +173,7 @@ export class PersonaService {
 				this.qloo.testConnection()
 			]);
 
-			return {
+			const result = {
 				success: true,
 				data: {
 					llm: {
@@ -181,7 +185,21 @@ export class PersonaService {
 				},
 				message: `OpenAI: ${openaiTest.success ? 'Connected' : 'Failed'}, Anthropic: ${anthropicTest.success ? 'Connected' : 'Failed'}, Gemini: ${geminiTest.success ? 'Connected' : 'Failed'}, Qloo: ${qlooTest.success ? 'Connected' : 'Failed'}`
 			};
+
+			// Only log if there are failures
+			const hasFailures = !openaiTest.success || !anthropicTest.success || !geminiTest.success || !qlooTest.success;
+			if (hasFailures) {
+				console.warn('[PersonaService] API test failures detected:', {
+					openai: !openaiTest.success ? openaiTest.message : 'OK',
+					anthropic: !anthropicTest.success ? anthropicTest.message : 'OK',
+					gemini: !geminiTest.success ? geminiTest.message : 'OK',
+					qloo: !qlooTest.success ? qlooTest.message : 'OK'
+				});
+			}
+
+			return result;
 		} catch (error) {
+			console.error('[PersonaService] testAPIs error:', error);
 			return {
 				success: false,
 				error: 'Failed to test API connections'
